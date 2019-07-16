@@ -19,15 +19,16 @@ use drfs::Entry;
 //      * Optionally load from permanent storage
 //  * Optionally use TUI to go through results
 fn main() {
-    let mut entry = Entry::new("/home/boris/qemu-machines").unwrap();
+    let target_name = "/home/boris/";
+    let mut entry = match Entry::new(target_name) {
+        Err(e) => panic!("{}", e),
+        Ok(v) => v,
+    };
     let e = &mut entry;
     if let Entry::Dir(e) = e {
         e.load_all_childen();
-        // let errors = e.load_childen();
-        // for err in errors {
-        // println!("Error in load children : {}", err);
-        // }
     }
-    // let entry = entry;
-    // println!("{:?}", entry);
+    println!("target is : {}", target_name);
+    println!("total number of entries : {}", entry.count_entries());
+    println!("total size in bytes is : {}", entry.calculate_size());
 }

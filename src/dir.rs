@@ -183,8 +183,8 @@ impl DirEntry {
             iter::repeat_with(|| {
                 // Try stealing a batch of tasks from the global queue.
                 global
-                    // .steal_batch_and_pop(local)
-                    .steal()
+                    .steal_batch_and_pop(local)
+                    // .steal()
                     // Or try stealing a task from one of the other threads.
                     .or_else(|| stealers.iter().map(|s| s.steal()).collect())
             })
