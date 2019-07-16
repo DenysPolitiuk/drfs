@@ -26,4 +26,18 @@ impl Entry {
             Ok(Entry::File(FileEntry::new(path)?))
         }
     }
+
+    pub fn count_entries(&self) -> u64 {
+        match self {
+            Entry::File(_) => 1,
+            Entry::Dir(dir) => dir.count_entries(),
+        }
+    }
+
+    pub fn calculate_size(&self) -> u64 {
+        match self {
+            Entry::File(f) => f.get_size(),
+            Entry::Dir(dir) => dir.calculate_size_all_children(),
+        }
+    }
 }

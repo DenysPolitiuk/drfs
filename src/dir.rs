@@ -58,6 +58,34 @@ impl DirEntry {
         self.size_all_children
     }
 
+    pub fn count_entries(&self) -> u64 {
+        let mut counter = 0;
+
+        for c in &self.children {
+            let child = c.lock().unwrap();
+            match &*child {
+                Entry::File(_) => counter += 1,
+                Entry::Dir(dir) => {
+                    counter += dir.count_entries();
+                }
+            }
+        }
+
+        counter
+    }
+
+    pub fn calculate_size_all_children(&self) -> u64 {
+        let mut total = 0;
+        for c in &self.children {
+            let child = c.lock().unwrap();
+            total += match &*child {
+                Entry::File(f) => f.get_size(),
+                Entry::Dir(dir) => dir.calculate_size_all_children(),
+            };
+        }
+        total
+    }
+
     pub fn load_childen(&mut self) -> Vec<Box<Error>> {
         match fs::read_dir(self.path_buf.as_path()) {
             Err(e) => return vec![Box::new(e)],
