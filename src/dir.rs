@@ -125,6 +125,7 @@ impl DirEntry {
             stealers.push(s);
             workers.push(w);
         }
+        // TODO: change to atomic?
         let counter = Mutex::new(0);
         crossbeam::scope(|s| {
             for _ in 0..num_cpus::get() {
@@ -154,7 +155,7 @@ impl DirEntry {
                             }
                         };
                         *counter.lock().unwrap() -= 1;
-                        if *counter.lock().unwrap() == 0 && queue.is_empty() {
+                        if *counter.lock().unwrap() == 0 && queue.is_empty() && worker.is_empty() {
                             break;
                         }
                     }
