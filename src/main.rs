@@ -3,6 +3,7 @@ use clap::{App, Arg};
 use drfs::Entry;
 
 use std::env;
+use std::time::Instant;
 
 // TODO:
 //
@@ -45,7 +46,10 @@ fn main() {
     };
     let e = &mut entry;
     if let Entry::Dir(e) = e {
+        let start = Instant::now();
         e.load_all_childen();
+        let duration = start.elapsed();
+        println!("Took {} ms to load all children", duration.as_millis());
     }
     println!("target is : {}", target_name);
     println!("total number of entries : {}", entry.count_entries());
