@@ -9,6 +9,7 @@ use std::io;
 use std::iter;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::SystemTime;
@@ -125,25 +126,25 @@ impl DirEntry {
             stealers.push(s);
             workers.push(w);
         }
-        // TODO: change to atomic?
-        let counter = Mutex::new(0);
+        let counter = Arc::new(AtomicIsize::new(0));
         crossbeam::scope(|s| {
             for _ in 0..num_cpus::get() {
                 let queue = &queue;
                 let worker = workers.pop().unwrap();
                 let stealers = &stealers;
-                let counter = &counter;
+                let counter = counter.clone();
                 s.spawn(move |_| {
+                    let backoff = crossbeam::utils::Backoff::new();
                     loop {
-                        *counter.lock().unwrap() += 1;
                         let task = DirEntry::find_task(&worker, &queue, &stealers);
                         match task {
                             // some buffer of time between stopping processing and empty queue
                             // expectation that if the queue is empty there is no more to process
                             // however, this might not be the case if there is a delay somewhere
                             // TODO: better sync method for workers
-                            None => (),
+                            None => backoff.snooze(),
                             Some(task) => {
+                                counter.fetch_add(1, Ordering::SeqCst);
                                 let task = Arc::clone(&task);
                                 let mut entry = task.lock().unwrap();
                                 if let Entry::Dir(ref mut d) = *entry {
@@ -152,10 +153,13 @@ impl DirEntry {
                                     if errors.len() > 0 {}
                                     d.add_children_to_queue(&queue);
                                 }
+                                counter.fetch_add(-1, Ordering::SeqCst);
                             }
                         };
-                        *counter.lock().unwrap() -= 1;
-                        if *counter.lock().unwrap() == 0 && queue.is_empty() && worker.is_empty() {
+                        if counter.load(Ordering::SeqCst) <= 0
+                            && queue.is_empty()
+                            && worker.is_empty()
+                        {
                             break;
                         }
                     }
