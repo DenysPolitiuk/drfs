@@ -49,5 +49,35 @@ fn main() {
     }
     println!("target is : {}", target_name);
     println!("total number of entries : {}", entry.count_entries());
-    println!("total size in bytes is : {}", entry.calculate_size());
+    let size = entry.calculate_size();
+    println!("total size in bytes is : {}", size);
+    let (converted_size, size_name) = bytes_to_other(size as f64);
+    println!("converted size is {} {}", converted_size, size_name);
+}
+
+fn bytes_to_other(bytes: f64) -> (f64, String) {
+    let (converted_size, depth) = _bytes_to_other(bytes, 0);
+    (converted_size, _depth_to_word(depth))
+}
+
+fn _bytes_to_other(bytes: f64, depth: u32) -> (f64, u32) {
+    if bytes > 1.0 {
+        return _bytes_to_other(bytes / 1024.0, depth + 1);
+    }
+    if depth < 1 {
+        (bytes, depth)
+    } else {
+        (bytes * 1024.0, depth - 1)
+    }
+}
+
+fn _depth_to_word(depth: u32) -> String {
+    match depth {
+        0 => "B".to_string(),
+        1 => "KB".to_string(),
+        2 => "MB".to_string(),
+        3 => "GB".to_string(),
+        4 => "TB".to_string(),
+        _ => format!("more than TB, depth {}", depth),
+    }
 }
