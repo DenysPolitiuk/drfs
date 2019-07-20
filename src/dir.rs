@@ -11,7 +11,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::RwLock;
 use std::time::SystemTime;
 
 use crate::Entry;
@@ -24,7 +24,7 @@ pub struct DirEntry {
     last_access_time: Result<SystemTime, io::Error>,
     last_modified_time: Result<SystemTime, io::Error>,
     creation_time: Result<SystemTime, io::Error>,
-    children: Vec<Arc<Mutex<Entry>>>,
+    children: RwLock<Vec<Arc<Entry>>>,
     parent: Box<Option<DirEntry>>,
 }
 
@@ -50,7 +50,7 @@ impl DirEntry {
             last_access_time: metadata.accessed(),
             last_modified_time: metadata.modified(),
             creation_time: metadata.created(),
-            children: vec![],
+            children: RwLock::new(vec![]),
             parent: Box::new(None),
         })
     }
@@ -62,11 +62,11 @@ impl DirEntry {
     pub fn count_entries(&self) -> u64 {
         let mut counter = 0;
 
-        for c in &self.children {
-            let child = c.lock().unwrap();
-            match &*child {
+        let children = &*self.children.read().unwrap();
+        for c in &*children {
+            match **c {
                 Entry::File(_) => counter += 1,
-                Entry::Dir(dir) => {
+                Entry::Dir(ref dir) => {
                     counter += dir.count_entries();
                 }
             }
@@ -77,43 +77,52 @@ impl DirEntry {
 
     pub fn calculate_size_all_children(&self) -> u64 {
         let mut total = 0;
-        for c in &self.children {
-            let child = c.lock().unwrap();
-            total += match &*child {
-                Entry::File(f) => f.get_size(),
-                Entry::Dir(dir) => dir.calculate_size_all_children(),
+        let children = &*self.children.read().unwrap();
+        for c in &*children {
+            total += match **c {
+                Entry::File(ref f) => f.get_size(),
+                Entry::Dir(ref dir) => dir.calculate_size_all_children(),
             };
         }
         total
     }
 
-    pub fn load_childen(&mut self) -> Vec<Box<Error>> {
-        match fs::read_dir(self.path_buf.as_path()) {
-            Err(e) => return vec![Box::new(e)],
+    pub fn get_load_children(&self) -> (Vec<Arc<Entry>>, Vec<Box<Error>>) {
+        let read_dir_results = match fs::read_dir(self.path_buf.as_path()) {
+            Err(e) => return (vec![], vec![Box::new(e)]),
             Ok(v) => v,
+        };
+
+        let mut errors: Vec<Box<Error>> = vec![];
+        let mut entries = vec![];
+        for dir_entry in read_dir_results {
+            let dir_entry = match dir_entry {
+                Err(e) => {
+                    errors.push(Box::new(e));
+                    continue;
+                }
+                Ok(value) => value,
+            };
+            let entry = match Entry::new(dir_entry.path()) {
+                Err(e) => {
+                    errors.push(e);
+                    continue;
+                }
+                Ok(value) => value,
+            };
+            entries.push(Arc::new(entry));
         }
-        .map(|entry| match Entry::new(entry?.path()) {
-            Err(e) => Err(e),
-            Ok(v) => {
-                let v_ref = &v;
-                match v_ref {
-                    Entry::File(f) => self.size_all_children += f.get_size(),
-                    _ => (),
-                };
-                self.children.push(Arc::new(Mutex::new(v)));
-                Ok(())
-            }
-        })
-        .filter_map(|x| x.err())
-        .collect()
+
+        (entries, errors)
     }
 
     pub fn load_all_childen(&mut self) -> Vec<Box<Error>> {
-        if self.children.len() != 0 {
+        if self.children.read().unwrap().len() != 0 {
             panic!("can only load children if have no children already exist");
         }
         // TODO: do something with errors
-        let _ = self.load_childen();
+        let (children, _) = self.get_load_children();
+        *self.children.write().unwrap() = children;
 
         let queue = Injector::new();
         self.add_children_to_queue(&queue);
@@ -121,7 +130,7 @@ impl DirEntry {
         let mut workers = vec![];
         // pre-populating stealers and workers
         for _ in 0..num_cpus::get() {
-            let w: Worker<Arc<Mutex<Entry>>> = Worker::new_fifo();
+            let w: Worker<Arc<Entry>> = Worker::new_fifo();
             let s = w.stealer();
             stealers.push(s);
             workers.push(w);
@@ -145,14 +154,15 @@ impl DirEntry {
                             None => backoff.snooze(),
                             Some(task) => {
                                 counter.fetch_add(1, Ordering::SeqCst);
-                                let task = Arc::clone(&task);
-                                let mut entry = task.lock().unwrap();
-                                if let Entry::Dir(ref mut d) = *entry {
-                                    let errors = d.load_childen();
+
+                                if let Entry::Dir(ref d) = *task {
+                                    let (children, errors) = d.get_load_children();
                                     // TODO: do something with errors
                                     if errors.len() > 0 {}
+                                    *d.children.write().unwrap() = children;
                                     d.add_children_to_queue(&queue);
                                 }
+
                                 counter.fetch_add(-1, Ordering::SeqCst);
                             }
                         };
@@ -172,10 +182,9 @@ impl DirEntry {
         vec![]
     }
 
-    fn add_children_to_queue(&self, queue: &Injector<Arc<Mutex<Entry>>>) {
-        self.children.iter().for_each(|c| {
-            let entry = c.lock().unwrap();
-            if let Entry::Dir(_) = *entry {
+    fn add_children_to_queue(&self, queue: &Injector<Arc<Entry>>) {
+        self.children.read().unwrap().iter().for_each(|c| {
+            if let Entry::Dir(_) = **c {
                 queue.push(Arc::clone(c));
             }
         });
