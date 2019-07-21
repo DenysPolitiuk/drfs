@@ -11,7 +11,8 @@ pub struct MemStorage<K, V> {
 
 impl<K, V> MemStorage<K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Send + Sync,
+    V: Send + Sync,
 {
     pub fn new() -> MemStorage<K, V> {
         MemStorage {
@@ -22,7 +23,8 @@ where
 
 impl<K, V> Storage<K, V> for MemStorage<K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Send + Sync,
+    V: Send + Sync,
 {
     fn set(&self, key: K, value: V) {
         self.map.lock().unwrap().insert(key, value);
