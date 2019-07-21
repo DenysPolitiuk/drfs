@@ -63,36 +63,58 @@ impl DirEntry {
         format!("{}", self.path_buf.display())
     }
 
-    pub fn count_entries(&self) -> u64 {
-        unimplemented!();
-        // TODO: implement
-        // let mut counter = 0;
+    pub fn count_entries(&self, storage: &Option<&GenericStorage>) -> usize {
+        let storage = match storage {
+            // if no storage can only know about it's own children
+            None => return self.children.len(),
+            Some(v) => v,
+        };
 
-        // let children = &*self.children.read().unwrap();
-        // for c in &*children {
-        // match **c {
-        // Entry::File(_) => counter += 1,
-        // Entry::Dir(ref dir) => {
-        // counter += dir.count_entries();
-        // }
-        // }
-        // }
+        let mut counter = 0;
 
-        // counter
+        for c in &self.children {
+            let entry = match storage.pull_out(&c) {
+                None => continue,
+                Some(v) => v,
+            };
+
+            match entry {
+                Entry::File(_) => counter += 1,
+                Entry::Dir(ref dir) => {
+                    counter += dir.count_entries(&Some(*storage));
+                }
+            }
+
+            storage.set(c.clone(), entry);
+        }
+
+        counter
     }
 
-    pub fn calculate_size_all_children(&self) -> u64 {
-        unimplemented!();
-        // TODO: implement
-        // let mut total = 0;
-        // let children = &*self.children.read().unwrap();
-        // for c in &*children {
-        // total += match **c {
-        // Entry::File(ref f) => f.get_size(),
-        // Entry::Dir(ref dir) => dir.calculate_size_all_children(),
-        // };
-        // }
-        // total
+    pub fn calculate_size_all_children(&self, storage: &Option<&GenericStorage>) -> u64 {
+        let storage = match storage {
+            // if no storage not able to know size of children
+            None => return 0,
+            Some(v) => v,
+        };
+
+        let mut total = 0;
+
+        for c in &self.children {
+            let entry = match storage.pull_out(&c) {
+                None => continue,
+                Some(v) => v,
+            };
+
+            total += match entry {
+                Entry::File(ref f) => f.get_size(),
+                Entry::Dir(ref dir) => dir.calculate_size_all_children(&Some(*storage)),
+            };
+
+            storage.set(c.clone(), entry);
+        }
+
+        total
     }
 
     pub fn get_load_children(&self) -> (Vec<Box<Entry>>, Vec<Box<Error>>) {

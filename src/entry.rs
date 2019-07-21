@@ -43,6 +43,20 @@ impl EntryWrapper {
             let _ = dir.load_all_childen_with_storage(&self.storage);
         }
     }
+
+    pub fn count_entries(&self) -> usize {
+        match &self.entry {
+            Entry::File(_) => 1,
+            Entry::Dir(dir) => dir.count_entries(&self.storage.as_ref()),
+        }
+    }
+
+    pub fn calculate_size(&self) -> u64 {
+        match &self.entry {
+            Entry::File(f) => f.get_size(),
+            Entry::Dir(dir) => dir.calculate_size_all_children(&self.storage.as_ref()),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -64,17 +78,17 @@ impl Entry {
         }
     }
 
-    pub fn count_entries(&self) -> u64 {
+    pub fn count_entries(&self) -> usize {
         match self {
             Entry::File(_) => 1,
-            Entry::Dir(dir) => dir.count_entries(),
+            Entry::Dir(dir) => dir.count_entries(&None),
         }
     }
 
     pub fn calculate_size(&self) -> u64 {
         match self {
             Entry::File(f) => f.get_size(),
-            Entry::Dir(dir) => dir.calculate_size_all_children(),
+            Entry::Dir(dir) => dir.calculate_size_all_children(&None),
         }
     }
 

@@ -1,6 +1,7 @@
 use clap::{App, Arg};
 
 use drfs::Entry;
+use drfs::EntryWrapper;
 
 use std::env;
 use std::time::Instant;
@@ -40,17 +41,15 @@ fn main() {
         .or(env::current_dir().unwrap().to_str())
         .unwrap()
         .to_owned();
-    let mut entry = match Entry::new(&target_name) {
+
+    let mut entry = match EntryWrapper::new_with_memstorage(&target_name) {
         Err(e) => panic!("{}", e),
         Ok(v) => v,
     };
-    let e = &mut entry;
-    if let Entry::Dir(e) = e {
-        let start = Instant::now();
-        e.load_all_childen();
-        let duration = start.elapsed();
-        println!("Took {} ms to load all children", duration.as_millis());
-    }
+    let start = Instant::now();
+    entry.load_all_childen();
+    let duration = start.elapsed();
+    println!("Took {} ms to load all children", duration.as_millis());
     println!("target is : {}", target_name);
     println!("total number of entries : {}", entry.count_entries());
     let size = entry.calculate_size();
