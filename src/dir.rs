@@ -25,12 +25,13 @@ pub struct DirEntry {
     last_modified_time: Result<SystemTime, io::Error>,
     creation_time: Result<SystemTime, io::Error>,
     children: Vec<String>,
-    parent: Box<Option<DirEntry>>,
+    parent: Option<String>,
 }
 
 impl DirEntry {
-    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+    pub fn new_with_parent<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
         path: P,
+        parent: Option<String>,
     ) -> Result<DirEntry, Box<Error>> {
         let p = Path::new(&path);
         let name = match p.file_name() {
@@ -51,8 +52,14 @@ impl DirEntry {
             last_modified_time: metadata.modified(),
             creation_time: metadata.created(),
             children: vec![],
-            parent: Box::new(None),
+            parent,
         })
+    }
+
+    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+        path: P,
+    ) -> Result<DirEntry, Box<Error>> {
+        DirEntry::new_with_parent(path, None)
     }
 
     pub fn get_size_all_children(&self) -> u64 {
