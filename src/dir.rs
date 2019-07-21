@@ -138,6 +138,8 @@ impl DirEntry {
         // TODO: do something with errors
         let (children, _) = self.get_load_children();
 
+        self.clone_children_to_current(&children);
+
         let queue = Injector::new();
 
         let mut file_entries = DirEntry::add_children_to_queue(children, &queue);
@@ -172,11 +174,12 @@ impl DirEntry {
                             // however, this might not be the case if there is a delay somewhere
                             // TODO: better sync method for workers
                             None => backoff.snooze(),
-                            Some(task) => {
+                            Some(mut task) => {
                                 counter.fetch_add(1, Ordering::SeqCst);
 
-                                if let Entry::Dir(ref d) = *task {
+                                if let Entry::Dir(ref mut d) = *task {
                                     let (children, errors) = d.get_load_children();
+                                    d.clone_children_to_current(&children);
                                     // TODO: do something with errors
                                     if errors.len() > 0 {}
                                     let mut file_entries =
@@ -208,6 +211,12 @@ impl DirEntry {
 
         // TODO: return errors
         vec![]
+    }
+
+    fn clone_children_to_current(&mut self, children: &Vec<Box<Entry>>) {
+        for child in children.iter() {
+            self.children.push(child.get_format_path());
+        }
     }
 
     fn store_entry(storage: &Option<GenericStorage>, key: String, entry: Entry) {
