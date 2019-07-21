@@ -1,6 +1,5 @@
 use clap::{App, Arg};
 
-use drfs::Entry;
 use drfs::EntryWrapper;
 
 use std::env;

@@ -1,10 +1,11 @@
+use std::convert::AsRef;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::path::Path;
 
 use crate::dir::DirEntry;
 use crate::file::FileEntry;
-use crate::store::MemStorage;
-use crate::store::Storage;
+use crate::store::{MemStorage, Storage};
 
 // TODO:
 //
@@ -18,16 +19,14 @@ pub struct EntryWrapper {
 pub type GenericStorage = Box<dyn Storage<String, Entry> + Send + Sync>;
 
 impl EntryWrapper {
-    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
-        path: P,
-    ) -> Result<EntryWrapper, Box<Error>> {
+    pub fn new<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<EntryWrapper, Box<Error>> {
         let entry = Entry::new(path)?;
         Ok(EntryWrapper {
             entry,
             storage: None,
         })
     }
-    pub fn new_with_memstorage<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+    pub fn new_with_memstorage<P: AsRef<Path> + AsRef<OsStr>>(
         path: P,
     ) -> Result<EntryWrapper, Box<Error>> {
         let entry = Entry::new(path)?;
@@ -66,7 +65,7 @@ pub enum Entry {
 }
 
 impl Entry {
-    pub fn new_with_parent<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+    pub fn new_with_parent<P: AsRef<Path> + AsRef<OsStr>>(
         path: P,
         parent: Option<String>,
     ) -> Result<Entry, Box<Error>> {
@@ -79,9 +78,7 @@ impl Entry {
         }
     }
 
-    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
-        path: P,
-    ) -> Result<Entry, Box<Error>> {
+    pub fn new<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<Entry, Box<Error>> {
         Entry::new_with_parent(path, None)
     }
 

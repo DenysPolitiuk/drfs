@@ -4,17 +4,16 @@ extern crate num_cpus;
 use crossbeam::deque::{Injector, Stealer, Worker};
 
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::iter;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use crate::entry::GenericStorage;
-use crate::Entry;
+use crate::{Entry, GenericStorage};
 
 #[derive(Debug)]
 pub struct DirEntry {
@@ -29,7 +28,7 @@ pub struct DirEntry {
 }
 
 impl DirEntry {
-    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+    pub fn new<P: AsRef<Path> + AsRef<OsStr>>(
         path: P,
         parent: Option<String>,
     ) -> Result<DirEntry, Box<Error>> {

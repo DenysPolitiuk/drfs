@@ -1,7 +1,8 @@
+use std::convert::AsRef;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::io;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 #[derive(Debug)]
@@ -16,7 +17,7 @@ pub struct FileEntry {
 }
 
 impl FileEntry {
-    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+    pub fn new<P: AsRef<Path> + AsRef<OsStr>>(
         path: P,
         parent: Option<String>,
     ) -> Result<FileEntry, Box<Error>> {
