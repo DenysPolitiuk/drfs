@@ -66,16 +66,23 @@ pub enum Entry {
 }
 
 impl Entry {
-    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+    pub fn new_with_parent<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
         path: P,
+        parent: Option<String>,
     ) -> Result<Entry, Box<Error>> {
         let p = Path::new(&path);
 
         if p.is_dir() {
-            Ok(Entry::Dir(DirEntry::new(path)?))
+            Ok(Entry::Dir(DirEntry::new(path, parent)?))
         } else {
-            Ok(Entry::File(FileEntry::new(path)?))
+            Ok(Entry::File(FileEntry::new(path, parent)?))
         }
+    }
+
+    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+        path: P,
+    ) -> Result<Entry, Box<Error>> {
+        Entry::new_with_parent(path, None)
     }
 
     pub fn count_entries(&self) -> usize {

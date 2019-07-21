@@ -12,11 +12,13 @@ pub struct FileEntry {
     last_access_time: Result<SystemTime, io::Error>,
     last_modified_time: Result<SystemTime, io::Error>,
     creation_time: Result<SystemTime, io::Error>,
+    parent: Option<String>,
 }
 
 impl FileEntry {
     pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
         path: P,
+        parent: Option<String>,
     ) -> Result<FileEntry, Box<Error>> {
         let p = Path::new(&path);
         let name = match p.file_name() {
@@ -35,6 +37,7 @@ impl FileEntry {
             last_access_time: metadata.accessed(),
             last_modified_time: metadata.modified(),
             creation_time: metadata.created(),
+            parent,
         })
     }
 

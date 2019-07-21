@@ -29,7 +29,7 @@ pub struct DirEntry {
 }
 
 impl DirEntry {
-    pub fn new_with_parent<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
+    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
         path: P,
         parent: Option<String>,
     ) -> Result<DirEntry, Box<Error>> {
@@ -54,12 +54,6 @@ impl DirEntry {
             children: vec![],
             parent,
         })
-    }
-
-    pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
-        path: P,
-    ) -> Result<DirEntry, Box<Error>> {
-        DirEntry::new_with_parent(path, None)
     }
 
     pub fn get_size_all_children(&self) -> u64 {
@@ -140,7 +134,8 @@ impl DirEntry {
                 }
                 Ok(value) => value,
             };
-            let entry = match Entry::new(dir_entry.path()) {
+            let entry = match Entry::new_with_parent(dir_entry.path(), Some(self.get_format_path()))
+            {
                 Err(e) => {
                     errors.push(e);
                     continue;
