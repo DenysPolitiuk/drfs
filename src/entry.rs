@@ -12,8 +12,10 @@ use crate::store::Storage;
 
 pub struct EntryWrapper {
     entry: Entry,
-    storage: Option<Box<dyn Storage<String, Entry>>>,
+    storage: Option<GenericStorage>,
 }
+
+pub type GenericStorage = Box<dyn Storage<String, Entry> + Send + Sync>;
 
 impl EntryWrapper {
     pub fn new<P: AsRef<Path> + std::convert::AsRef<std::ffi::OsStr>>(
@@ -73,6 +75,13 @@ impl Entry {
         match self {
             Entry::File(f) => f.get_size(),
             Entry::Dir(dir) => dir.calculate_size_all_children(),
+        }
+    }
+
+    pub fn get_format_path(&self) -> String {
+        match self {
+            Entry::File(f) => f.get_format_path(),
+            Entry::Dir(dir) => dir.get_format_path(),
         }
     }
 }

@@ -11,10 +11,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::time::SystemTime;
 
-use crate::store::Storage;
+use crate::entry::GenericStorage;
 use crate::Entry;
 
 #[derive(Debug)]
@@ -25,7 +24,7 @@ pub struct DirEntry {
     last_access_time: Result<SystemTime, io::Error>,
     last_modified_time: Result<SystemTime, io::Error>,
     creation_time: Result<SystemTime, io::Error>,
-    children: RwLock<Vec<Arc<Entry>>>,
+    children: Vec<String>,
     parent: Box<Option<DirEntry>>,
 }
 
@@ -51,7 +50,7 @@ impl DirEntry {
             last_access_time: metadata.accessed(),
             last_modified_time: metadata.modified(),
             creation_time: metadata.created(),
-            children: RwLock::new(vec![]),
+            children: vec![],
             parent: Box::new(None),
         })
     }
@@ -60,35 +59,43 @@ impl DirEntry {
         self.size_all_children
     }
 
+    pub fn get_format_path(&self) -> String {
+        format!("{}", self.path_buf.display())
+    }
+
     pub fn count_entries(&self) -> u64 {
-        let mut counter = 0;
+        unimplemented!();
+        // TODO: implement
+        // let mut counter = 0;
 
-        let children = &*self.children.read().unwrap();
-        for c in &*children {
-            match **c {
-                Entry::File(_) => counter += 1,
-                Entry::Dir(ref dir) => {
-                    counter += dir.count_entries();
-                }
-            }
-        }
+        // let children = &*self.children.read().unwrap();
+        // for c in &*children {
+        // match **c {
+        // Entry::File(_) => counter += 1,
+        // Entry::Dir(ref dir) => {
+        // counter += dir.count_entries();
+        // }
+        // }
+        // }
 
-        counter
+        // counter
     }
 
     pub fn calculate_size_all_children(&self) -> u64 {
-        let mut total = 0;
-        let children = &*self.children.read().unwrap();
-        for c in &*children {
-            total += match **c {
-                Entry::File(ref f) => f.get_size(),
-                Entry::Dir(ref dir) => dir.calculate_size_all_children(),
-            };
-        }
-        total
+        unimplemented!();
+        // TODO: implement
+        // let mut total = 0;
+        // let children = &*self.children.read().unwrap();
+        // for c in &*children {
+        // total += match **c {
+        // Entry::File(ref f) => f.get_size(),
+        // Entry::Dir(ref dir) => dir.calculate_size_all_children(),
+        // };
+        // }
+        // total
     }
 
-    pub fn get_load_children(&self) -> (Vec<Arc<Entry>>, Vec<Box<Error>>) {
+    pub fn get_load_children(&self) -> (Vec<Box<Entry>>, Vec<Box<Error>>) {
         let read_dir_results = match fs::read_dir(self.path_buf.as_path()) {
             Err(e) => return (vec![], vec![Box::new(e)]),
             Ok(v) => v,
@@ -111,7 +118,7 @@ impl DirEntry {
                 }
                 Ok(value) => value,
             };
-            entries.push(Arc::new(entry));
+            entries.push(Box::new(entry));
         }
 
         (entries, errors)
@@ -123,22 +130,26 @@ impl DirEntry {
 
     pub fn load_all_childen_with_storage(
         &mut self,
-        storage: &Option<Box<dyn Storage<String, Entry>>>,
+        storage: &Option<GenericStorage>,
     ) -> Vec<Box<Error>> {
-        if self.children.read().unwrap().len() != 0 {
+        if self.children.len() != 0 {
             panic!("can only load children if have no children already exist");
         }
         // TODO: do something with errors
         let (children, _) = self.get_load_children();
-        *self.children.write().unwrap() = children;
 
         let queue = Injector::new();
-        self.add_children_to_queue(&queue);
+
+        let mut file_entries = DirEntry::add_children_to_queue(children, &queue);
+        while let Some(entry) = file_entries.pop() {
+            DirEntry::store_entry(&storage, entry.get_format_path(), *entry);
+        }
+
         let mut stealers = vec![];
         let mut workers = vec![];
         // pre-populating stealers and workers
         for _ in 0..num_cpus::get() {
-            let w: Worker<Arc<Entry>> = Worker::new_fifo();
+            let w = Worker::new_fifo();
             let s = w.stealer();
             stealers.push(s);
             workers.push(w);
@@ -150,6 +161,7 @@ impl DirEntry {
                 let worker = workers.pop().unwrap();
                 let stealers = &stealers;
                 let counter = counter.clone();
+                let storage = &storage;
                 s.spawn(move |_| {
                     let backoff = crossbeam::utils::Backoff::new();
                     loop {
@@ -167,9 +179,17 @@ impl DirEntry {
                                     let (children, errors) = d.get_load_children();
                                     // TODO: do something with errors
                                     if errors.len() > 0 {}
-                                    *d.children.write().unwrap() = children;
-                                    d.add_children_to_queue(&queue);
+                                    let mut file_entries =
+                                        DirEntry::add_children_to_queue(children, &queue);
+                                    while let Some(entry) = file_entries.pop() {
+                                        DirEntry::store_entry(
+                                            &storage,
+                                            entry.get_format_path(),
+                                            *entry,
+                                        );
+                                    }
                                 }
+                                DirEntry::store_entry(&storage, task.get_format_path(), *task);
 
                                 counter.fetch_add(-1, Ordering::SeqCst);
                             }
@@ -190,12 +210,26 @@ impl DirEntry {
         vec![]
     }
 
-    fn add_children_to_queue(&self, queue: &Injector<Arc<Entry>>) {
-        self.children.read().unwrap().iter().for_each(|c| {
-            if let Entry::Dir(_) = **c {
-                queue.push(Arc::clone(c));
+    fn store_entry(storage: &Option<GenericStorage>, key: String, entry: Entry) {
+        if let Some(storage) = storage {
+            storage.set(key, entry);
+        }
+    }
+
+    fn add_children_to_queue(
+        mut children: Vec<Box<Entry>>,
+        queue: &Injector<Box<Entry>>,
+    ) -> Vec<Box<Entry>> {
+        let mut file_entries = vec![];
+
+        while let Some(child) = children.pop() {
+            match *child {
+                Entry::Dir(_) => queue.push(child),
+                Entry::File(_) => file_entries.push(child),
             }
-        });
+        }
+
+        file_entries
     }
 
     fn find_task<T>(local: &Worker<T>, global: &Injector<T>, stealers: &[Stealer<T>]) -> Option<T> {

@@ -41,4 +41,8 @@ impl FileEntry {
     pub fn get_size(&self) -> u64 {
         self.size
     }
+
+    pub fn get_format_path(&self) -> String {
+        format!("{}", self.path.display())
+    }
 }
