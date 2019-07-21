@@ -24,16 +24,16 @@ impl<K, V> Storage<K, V> for MemStorage<K, V>
 where
     K: Hash + Eq,
 {
-    fn set(&mut self, key: K, value: V) {
+    fn set(&self, key: K, value: V) {
         self.map.lock().unwrap().insert(key, value);
     }
     fn get(&self, _key: &K) -> Option<V> {
         unimplemented!();
     }
-    fn pull_out(&mut self, key: &K) -> Option<V> {
+    fn pull_out(&self, key: &K) -> Option<V> {
         self.map.lock().unwrap().remove(key)
     }
-    fn remove(&mut self, key: &K) {
+    fn remove(&self, key: &K) {
         self.map.lock().unwrap().remove(key);
     }
 }

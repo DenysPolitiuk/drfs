@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
+use crate::store::Storage;
 use crate::Entry;
 
 #[derive(Debug)]
@@ -117,6 +118,13 @@ impl DirEntry {
     }
 
     pub fn load_all_childen(&mut self) -> Vec<Box<Error>> {
+        self.load_all_childen_with_storage(&None)
+    }
+
+    pub fn load_all_childen_with_storage(
+        &mut self,
+        storage: &Option<Box<dyn Storage<String, Entry>>>,
+    ) -> Vec<Box<Error>> {
         if self.children.read().unwrap().len() != 0 {
             panic!("can only load children if have no children already exist");
         }
