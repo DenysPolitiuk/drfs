@@ -177,22 +177,14 @@ impl DirEntry {
 
         self.clone_children_to_current(&children);
 
-        let queue = Injector::new();
+        let (queue, mut workers, stealers) =
+            DirEntry::create_queue_workers_stealers(num_cpus::get());
 
         let mut file_entries = DirEntry::add_children_to_queue(children, &queue);
         while let Some(entry) = file_entries.pop() {
             DirEntry::store_entry(&storage, entry.get_format_path(), *entry);
         }
 
-        let mut stealers = vec![];
-        let mut workers = vec![];
-        // pre-populating stealers and workers
-        for _ in 0..num_cpus::get() {
-            let w = Worker::new_fifo();
-            let s = w.stealer();
-            stealers.push(s);
-            workers.push(w);
-        }
         let counter = Arc::new(AtomicIsize::new(0));
         let all_errors_ref = &mut all_errors;
         crossbeam::scope(|s| {
@@ -296,6 +288,22 @@ impl DirEntry {
         }
 
         file_entries
+    }
+
+    fn create_queue_workers_stealers<T>(
+        number: usize,
+    ) -> (Injector<T>, Vec<Worker<T>>, Vec<Stealer<T>>) {
+        let queue = Injector::new();
+        let mut stealers = vec![];
+        let mut workers = vec![];
+
+        for _ in 0..number {
+            let w = Worker::new_fifo();
+            let s = w.stealer();
+            stealers.push(s);
+            workers.push(w);
+        }
+        (queue, workers, stealers)
     }
 
     fn find_task<T>(local: &Worker<T>, global: &Injector<T>, stealers: &[Stealer<T>]) -> Option<T> {
