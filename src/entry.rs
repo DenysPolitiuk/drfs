@@ -36,10 +36,10 @@ impl EntryWrapper {
         })
     }
 
-    pub fn load_all_childen(&mut self) {
+    pub fn load_all_children(&mut self) {
         if let Entry::Dir(ref mut dir) = self.entry {
             // TODO: do something with errors
-            let _ = dir.load_all_childen_with_storage(&self.storage);
+            let _ = dir.load_all_children_with_storage(&self.storage);
         }
     }
 

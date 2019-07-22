@@ -160,11 +160,7 @@ impl DirEntry {
         (entries, errors)
     }
 
-    pub fn load_all_childen(&mut self) -> Vec<Box<Error>> {
-        self.load_all_childen_with_storage(&None)
-    }
-
-    pub fn load_all_childen_with_storage(
+    pub fn load_all_children_with_storage(
         &mut self,
         storage: &Option<GenericStorage>,
     ) -> Vec<Box<Error>> {

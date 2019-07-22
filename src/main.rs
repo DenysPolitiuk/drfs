@@ -66,7 +66,7 @@ fn main() {
         };
 
         total_load_children += execute_with_measure_execution_time(|| {
-            entry.load_all_childen();
+            entry.load_all_children();
         });
 
         println!("target is : {}", target_name);
