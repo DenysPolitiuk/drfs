@@ -3,7 +3,6 @@ extern crate num_cpus;
 
 use crossbeam::deque::{Injector, Stealer, Worker};
 
-use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
 use std::io;
@@ -13,7 +12,7 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use crate::{Entry, GenericStorage};
+use crate::{Entry, GenericError, GenericStorage};
 
 #[derive(Debug, Clone)]
 pub struct DirEntry {
@@ -32,7 +31,7 @@ impl DirEntry {
     pub fn new<P: AsRef<Path> + AsRef<OsStr>>(
         path: P,
         parent: Option<String>,
-    ) -> Result<DirEntry, Box<Error>> {
+    ) -> Result<DirEntry, GenericError> {
         let p = Path::new(&path);
         let name = match p.file_name() {
             None => Err(format!("unable to get name from path {}", p.display()))?,
@@ -130,13 +129,13 @@ impl DirEntry {
         total
     }
 
-    pub fn get_load_children(&self) -> (Vec<Box<Entry>>, Vec<Box<Error>>) {
+    pub fn get_load_children(&self) -> (Vec<Box<Entry>>, Vec<GenericError>) {
         let read_dir_results = match fs::read_dir(self.path_buf.as_path()) {
             Err(e) => return (vec![], vec![Box::new(e)]),
             Ok(v) => v,
         };
 
-        let mut errors: Vec<Box<Error>> = vec![];
+        let mut errors: Vec<GenericError> = vec![];
         let mut entries = vec![];
         for dir_entry in read_dir_results {
             let dir_entry = match dir_entry {
@@ -163,7 +162,7 @@ impl DirEntry {
     pub fn load_all_children_with_storage(
         &mut self,
         storage: &Option<GenericStorage>,
-    ) -> Vec<Box<Error>> {
+    ) -> Vec<GenericError> {
         if self.children.len() != 0 {
             panic!("can only load children if have no children already exist");
         }

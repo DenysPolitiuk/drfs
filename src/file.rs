@@ -1,10 +1,11 @@
 use std::convert::AsRef;
-use std::error::Error;
 use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
+
+use crate::GenericError;
 
 #[derive(Debug, Clone)]
 pub struct FileEntry {
@@ -21,7 +22,7 @@ impl FileEntry {
     pub fn new<P: AsRef<Path> + AsRef<OsStr>>(
         path: P,
         parent: Option<String>,
-    ) -> Result<FileEntry, Box<Error>> {
+    ) -> Result<FileEntry, GenericError> {
         let p = Path::new(&path);
         let name = match p.file_name() {
             None => Err(format!("unable to get name from path {}", p.display()))?,

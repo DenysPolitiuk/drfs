@@ -17,9 +17,10 @@ pub struct EntryWrapper {
 }
 
 pub type GenericStorage = Box<dyn Storage<String, Entry> + Send + Sync>;
+pub type GenericError = Box<Error + Send + Sync>;
 
 impl EntryWrapper {
-    pub fn new<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<EntryWrapper, Box<Error>> {
+    pub fn new<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<EntryWrapper, GenericError> {
         let entry = Entry::new(path)?;
         Ok(EntryWrapper {
             entry,
@@ -28,7 +29,7 @@ impl EntryWrapper {
     }
     pub fn new_with_memstorage<P: AsRef<Path> + AsRef<OsStr>>(
         path: P,
-    ) -> Result<EntryWrapper, Box<Error>> {
+    ) -> Result<EntryWrapper, GenericError> {
         let entry = Entry::new(path)?;
         Ok(EntryWrapper {
             entry,
@@ -68,7 +69,7 @@ impl Entry {
     pub fn new_with_parent<P: AsRef<Path> + AsRef<OsStr>>(
         path: P,
         parent: Option<String>,
-    ) -> Result<Entry, Box<Error>> {
+    ) -> Result<Entry, GenericError> {
         let p = Path::new(&path);
 
         if p.is_dir() {
@@ -78,7 +79,7 @@ impl Entry {
         }
     }
 
-    pub fn new<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<Entry, Box<Error>> {
+    pub fn new<P: AsRef<Path> + AsRef<OsStr>>(path: P) -> Result<Entry, GenericError> {
         Entry::new_with_parent(path, None)
     }
 
