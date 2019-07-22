@@ -8,7 +8,7 @@ use std::fs;
 use std::io;
 use std::iter;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::SystemTime;
 
@@ -77,6 +77,62 @@ impl DirEntry {
         format!("{}", self.path_buf.display())
     }
 
+    pub fn count_entries_multi(&self, storage: &Option<&GenericStorage>) -> usize {
+        let storage = match storage {
+            // if no storage can only know about it's own children
+            None => return self.children.len(),
+            Some(v) => v,
+        };
+
+        let (queue, mut workers, stealers) =
+            DirEntry::create_queue_workers_stealers(num_cpus::get());
+
+        DirEntry::add_generic_to_queue(&self.children, &queue);
+
+        let counter = Arc::new(AtomicIsize::new(0));
+        let total_entries = Arc::new(AtomicUsize::new(0));
+        crossbeam::scope(|s| {
+            for _ in 0..num_cpus::get() {
+                let queue = &queue;
+                let worker = workers.pop().unwrap();
+                let stealers = &stealers;
+                let counter = counter.clone();
+                let total_entries = total_entries.clone();
+
+                s.spawn(move |_| {
+                    let backoff = crossbeam::utils::Backoff::new();
+                    loop {
+                        let task = DirEntry::find_task(&worker, &queue, &stealers);
+                        match task {
+                            None => backoff.snooze(),
+                            Some(task) => {
+                                counter.fetch_add(1, Ordering::SeqCst);
+
+                                if let Some(entry) = storage.get(&task) {
+                                    total_entries.fetch_add(1, Ordering::SeqCst);
+                                    if let Entry::Dir(ref dir) = entry {
+                                        DirEntry::add_generic_to_queue(&dir.children, &queue);
+                                    }
+                                };
+
+                                counter.fetch_add(-1, Ordering::SeqCst);
+                            }
+                        };
+                        if counter.load(Ordering::SeqCst) <= 0
+                            && queue.is_empty()
+                            && worker.is_empty()
+                        {
+                            break;
+                        }
+                    }
+                });
+            }
+        })
+        .unwrap();
+
+        total_entries.load(Ordering::Relaxed)
+    }
+
     pub fn count_entries(&self, storage: &Option<&GenericStorage>) -> usize {
         let storage = match storage {
             // if no storage can only know about it's own children
@@ -92,15 +148,70 @@ impl DirEntry {
                 Some(v) => v,
             };
 
-            match entry {
-                Entry::File(_) => counter += 1,
-                Entry::Dir(ref dir) => {
-                    counter += dir.count_entries(&Some(*storage));
-                }
+            counter += 1;
+            if let Entry::Dir(ref dir) = entry {
+                counter += dir.count_entries(&Some(*storage));
             }
         }
 
         counter
+    }
+
+    pub fn calculate_size_all_children_multi(&self, storage: &Option<&GenericStorage>) -> u64 {
+        let storage = match storage {
+            // if no storage not able to know size of children
+            None => return 0,
+            Some(v) => v,
+        };
+
+        let (queue, mut workers, stealers) =
+            DirEntry::create_queue_workers_stealers(num_cpus::get());
+
+        DirEntry::add_generic_to_queue(&self.children, &queue);
+
+        let counter = Arc::new(AtomicIsize::new(0));
+        let total_size = Arc::new(AtomicUsize::new(0));
+        crossbeam::scope(|s| {
+            for _ in 0..num_cpus::get() {
+                let queue = &queue;
+                let worker = workers.pop().unwrap();
+                let stealers = &stealers;
+                let counter = counter.clone();
+                let total_size = total_size.clone();
+
+                s.spawn(move |_| {
+                    let backoff = crossbeam::utils::Backoff::new();
+                    loop {
+                        let task = DirEntry::find_task(&worker, &queue, &stealers);
+                        match task {
+                            None => backoff.snooze(),
+                            Some(task) => {
+                                counter.fetch_add(1, Ordering::SeqCst);
+
+                                if let Some(entry) = storage.get(&task) {
+                                    total_size
+                                        .fetch_add(entry.get_size() as usize, Ordering::SeqCst);
+                                    if let Entry::Dir(ref dir) = entry {
+                                        DirEntry::add_generic_to_queue(&dir.children, &queue);
+                                    }
+                                };
+
+                                counter.fetch_add(-1, Ordering::SeqCst);
+                            }
+                        };
+                        if counter.load(Ordering::SeqCst) <= 0
+                            && queue.is_empty()
+                            && worker.is_empty()
+                        {
+                            break;
+                        }
+                    }
+                });
+            }
+        })
+        .unwrap();
+
+        total_size.load(Ordering::Relaxed) as u64
     }
 
     pub fn calculate_size_all_children(&self, storage: &Option<&GenericStorage>) -> u64 {
@@ -271,6 +382,12 @@ impl DirEntry {
     fn store_entry(storage: &Option<GenericStorage>, key: String, entry: Entry) {
         if let Some(storage) = storage {
             storage.set(key, entry);
+        }
+    }
+
+    fn add_generic_to_queue<T: Clone>(to_add: &Vec<T>, queue: &Injector<T>) {
+        for entry in to_add.iter() {
+            queue.push(entry.clone());
         }
     }
 
