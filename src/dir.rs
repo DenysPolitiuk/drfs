@@ -15,14 +15,14 @@ use std::time::SystemTime;
 
 use crate::{Entry, GenericStorage};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DirEntry {
     name: String,
     path_buf: Box<PathBuf>,
     size_all_children: u64,
-    last_access_time: Result<SystemTime, io::Error>,
-    last_modified_time: Result<SystemTime, io::Error>,
-    creation_time: Result<SystemTime, io::Error>,
+    last_access_time: Result<SystemTime, Arc<io::Error>>,
+    last_modified_time: Result<SystemTime, Arc<io::Error>>,
+    creation_time: Result<SystemTime, Arc<io::Error>>,
     children: Vec<String>,
     parent: Option<String>,
 }
@@ -47,9 +47,18 @@ impl DirEntry {
             name,
             path_buf: Box::new(p.to_owned()),
             size_all_children: 0,
-            last_access_time: metadata.accessed(),
-            last_modified_time: metadata.modified(),
-            creation_time: metadata.created(),
+            last_access_time: match metadata.accessed() {
+                Ok(v) => Ok(v),
+                Err(e) => Err(Arc::new(e)),
+            },
+            last_modified_time: match metadata.modified() {
+                Ok(v) => Ok(v),
+                Err(e) => Err(Arc::new(e)),
+            },
+            creation_time: match metadata.created() {
+                Ok(v) => Ok(v),
+                Err(e) => Err(Arc::new(e)),
+            },
             children: vec![],
             parent,
         })
@@ -73,7 +82,7 @@ impl DirEntry {
         let mut counter = 0;
 
         for c in &self.children {
-            let entry = match storage.pull_out(&c) {
+            let entry = match storage.get(&c) {
                 None => continue,
                 Some(v) => v,
             };
@@ -84,8 +93,6 @@ impl DirEntry {
                     counter += dir.count_entries(&Some(*storage));
                 }
             }
-
-            storage.set(c.clone(), entry);
         }
 
         counter
@@ -101,7 +108,7 @@ impl DirEntry {
         let mut total = 0;
 
         for c in &self.children {
-            let entry = match storage.pull_out(&c) {
+            let entry = match storage.get(&c) {
                 None => continue,
                 Some(v) => v,
             };
@@ -110,8 +117,6 @@ impl DirEntry {
                 Entry::File(ref f) => f.get_size(),
                 Entry::Dir(ref dir) => dir.calculate_size_all_children(&Some(*storage)),
             };
-
-            storage.set(c.clone(), entry);
         }
 
         total

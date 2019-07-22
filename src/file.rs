@@ -3,16 +3,17 @@ use std::error::Error;
 use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileEntry {
     name: String,
     path: Box<PathBuf>,
     size: u64,
-    last_access_time: Result<SystemTime, io::Error>,
-    last_modified_time: Result<SystemTime, io::Error>,
-    creation_time: Result<SystemTime, io::Error>,
+    last_access_time: Result<SystemTime, Arc<io::Error>>,
+    last_modified_time: Result<SystemTime, Arc<io::Error>>,
+    creation_time: Result<SystemTime, Arc<io::Error>>,
     parent: Option<String>,
 }
 
@@ -35,9 +36,18 @@ impl FileEntry {
             name,
             path: Box::new(p.to_owned()),
             size: metadata.len(),
-            last_access_time: metadata.accessed(),
-            last_modified_time: metadata.modified(),
-            creation_time: metadata.created(),
+            last_access_time: match metadata.accessed() {
+                Ok(v) => Ok(v),
+                Err(e) => Err(Arc::new(e)),
+            },
+            last_modified_time: match metadata.modified() {
+                Ok(v) => Ok(v),
+                Err(e) => Err(Arc::new(e)),
+            },
+            creation_time: match metadata.created() {
+                Ok(v) => Ok(v),
+                Err(e) => Err(Arc::new(e)),
+            },
             parent,
         })
     }

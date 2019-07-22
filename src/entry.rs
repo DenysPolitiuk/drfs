@@ -58,7 +58,7 @@ impl EntryWrapper {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Entry {
     File(FileEntry),
     Dir(DirEntry),
