@@ -142,15 +142,21 @@ impl DirEntry {
 
         let mut counter = 0;
 
+        let mut queue = vec![];
+
         for c in &self.children {
-            let entry = match storage.get(&c) {
+            queue.push(c.clone());
+        }
+
+        while let Some(c) = queue.pop() {
+            let mut entry = match storage.get(&c) {
                 None => continue,
                 Some(v) => v,
             };
 
             counter += 1;
-            if let Entry::Dir(ref dir) = entry {
-                counter += dir.count_entries(&Some(*storage));
+            if let Entry::Dir(ref mut dir) = entry {
+                queue.append(&mut dir.children);
             }
         }
 
@@ -223,18 +229,22 @@ impl DirEntry {
 
         let mut total = 0;
 
+        let mut queue = vec![];
+
         for c in &self.children {
-            let entry = match storage.get(&c) {
+            queue.push(c.clone());
+        }
+
+        while let Some(c) = queue.pop() {
+            let mut entry = match storage.get(&c) {
                 None => continue,
                 Some(v) => v,
             };
 
-            total += match entry {
-                Entry::File(ref f) => f.get_size(),
-                Entry::Dir(ref dir) => {
-                    entry.get_size() + dir.calculate_size_all_children(&Some(*storage))
-                }
-            };
+            total += entry.get_size();
+            if let Entry::Dir(ref mut dir) = entry {
+                queue.append(&mut dir.children);
+            }
         }
 
         total
