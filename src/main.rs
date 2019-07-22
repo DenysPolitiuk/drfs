@@ -33,6 +33,12 @@ fn main() {
                 .takes_value(true)
                 .help("target to process"),
         )
+        .arg(
+            Arg::with_name("loops")
+                .short("l")
+                .long("loops")
+                .takes_value(true),
+        )
         .get_matches();
 
     let target_name = matches
@@ -40,21 +46,54 @@ fn main() {
         .or(env::current_dir().unwrap().to_str())
         .unwrap()
         .to_owned();
+    let loops = matches
+        .value_of("loops")
+        .or(Some("1"))
+        .unwrap()
+        .parse::<u32>()
+        .expect("unable to parse loops");
 
-    let mut entry = match EntryWrapper::new_with_memstorage(&target_name) {
-        Err(e) => panic!("{}", e),
-        Ok(v) => v,
-    };
+    let mut total_load_children = 0;
+    let mut total_count_entries = 0;
+    let mut total_calculate_size = 0;
+
+    for i in 0..loops {
+        println!("\nTry #{}", i + 1);
+
+        let mut entry = match EntryWrapper::new_with_memstorage(&target_name) {
+            Err(e) => panic!("{}", e),
+            Ok(v) => v,
+        };
+
+        total_load_children += execute_with_measure_execution_time(|| {
+            entry.load_all_childen();
+        });
+
+        println!("target is : {}", target_name);
+
+        total_count_entries += execute_with_measure_execution_time(|| {
+            println!("total number of entries : {}", entry.count_entries());
+        });
+
+        total_calculate_size += execute_with_measure_execution_time(|| {
+            let size = entry.calculate_size();
+            println!("total size in bytes is : {}", size);
+
+            let (converted_size, size_name) = bytes_to_other(size as f64);
+            println!("converted size is {} {}", converted_size, size_name);
+        });
+    }
+
+    println!("Average over {} iterations is\n\tload children : {} ms\n\tcount entries : {} ms\n\tcalculation size : {} ms", loops,
+             total_load_children as f64 / loops as f64, total_count_entries as f64 / loops as f64, total_calculate_size as f64 / loops as f64);
+}
+
+fn execute_with_measure_execution_time<F: FnOnce()>(closure: F) -> u128 {
     let start = Instant::now();
-    entry.load_all_childen();
+    closure();
     let duration = start.elapsed();
-    println!("Took {} ms to load all children", duration.as_millis());
-    println!("target is : {}", target_name);
-    println!("total number of entries : {}", entry.count_entries());
-    let size = entry.calculate_size();
-    println!("total size in bytes is : {}", size);
-    let (converted_size, size_name) = bytes_to_other(size as f64);
-    println!("converted size is {} {}", converted_size, size_name);
+    println!("Took {} ms to execute", duration.as_millis());
+    duration.as_millis()
 }
 
 fn bytes_to_other(bytes: f64) -> (f64, String) {
