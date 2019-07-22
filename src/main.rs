@@ -39,6 +39,12 @@ fn main() {
                 .long("loops")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("quiet")
+                .short("q")
+                .long("quiet")
+                .help("don't output found errors"),
+        )
         .get_matches();
 
     let target_name = matches
@@ -52,6 +58,7 @@ fn main() {
         .unwrap()
         .parse::<u32>()
         .expect("unable to parse loops");
+    let quiet = matches.is_present("quiet");
 
     let mut total_load_children = 0;
     let mut total_count_entries = 0;
@@ -66,7 +73,12 @@ fn main() {
         };
 
         total_load_children += execute_with_measure_execution_time(|| {
-            entry.load_all_children();
+            let errors = entry.load_all_children();
+            if !quiet {
+                for error in errors {
+                    println!("{}", error);
+                }
+            }
         });
 
         println!("target is : {}", target_name);

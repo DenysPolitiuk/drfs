@@ -9,7 +9,7 @@ use std::io;
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicIsize, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use std::time::SystemTime;
 
 use crate::{Entry, GenericError, GenericStorage};
@@ -166,8 +166,14 @@ impl DirEntry {
         if self.children.len() != 0 {
             panic!("can only load children if have no children already exist");
         }
-        // TODO: do something with errors
-        let (children, _) = self.get_load_children();
+
+        let mut all_errors = vec![];
+
+        let (children, mut errors) = self.get_load_children();
+
+        if errors.len() > 0 {
+            all_errors.append(&mut errors);
+        }
 
         self.clone_children_to_current(&children);
 
@@ -188,14 +194,27 @@ impl DirEntry {
             workers.push(w);
         }
         let counter = Arc::new(AtomicIsize::new(0));
+        let all_errors_ref = &mut all_errors;
         crossbeam::scope(|s| {
+            let (tx, rx) = mpsc::channel();
+            s.spawn(move |_| loop {
+                let error = match rx.recv().unwrap() {
+                    None => break,
+                    Some(v) => v,
+                };
+
+                all_errors_ref.push(error);
+            });
+
+            let mut handlers = vec![];
             for _ in 0..num_cpus::get() {
                 let queue = &queue;
                 let worker = workers.pop().unwrap();
                 let stealers = &stealers;
                 let counter = counter.clone();
                 let storage = &storage;
-                s.spawn(move |_| {
+                let tx = tx.clone();
+                let handle = s.spawn(move |_| {
                     let backoff = crossbeam::utils::Backoff::new();
                     loop {
                         let task = DirEntry::find_task(&worker, &queue, &stealers);
@@ -209,10 +228,13 @@ impl DirEntry {
                                 counter.fetch_add(1, Ordering::SeqCst);
 
                                 if let Entry::Dir(ref mut d) = *task {
-                                    let (children, errors) = d.get_load_children();
+                                    let (children, mut errors) = d.get_load_children();
                                     d.clone_children_to_current(&children);
-                                    // TODO: do something with errors
-                                    if errors.len() > 0 {}
+                                    if errors.len() > 0 {
+                                        while let Some(error) = errors.pop() {
+                                            tx.send(Some(error)).unwrap();
+                                        }
+                                    }
                                     let mut file_entries =
                                         DirEntry::add_children_to_queue(children, &queue);
                                     while let Some(entry) = file_entries.pop() {
@@ -236,12 +258,16 @@ impl DirEntry {
                         }
                     }
                 });
+                handlers.push(handle);
             }
+            for handle in handlers {
+                handle.join().unwrap();
+            }
+            tx.send(None).unwrap();
         })
         .unwrap();
 
-        // TODO: return errors
-        vec![]
+        all_errors
     }
 
     fn clone_children_to_current(&mut self, children: &Vec<Box<Entry>>) {
