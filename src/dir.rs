@@ -19,6 +19,7 @@ use crate::{Entry, GenericStorage};
 pub struct DirEntry {
     name: String,
     path_buf: Box<PathBuf>,
+    size: u64,
     size_all_children: u64,
     last_access_time: Result<SystemTime, Arc<io::Error>>,
     last_modified_time: Result<SystemTime, Arc<io::Error>>,
@@ -46,6 +47,7 @@ impl DirEntry {
         Ok(DirEntry {
             name,
             path_buf: Box::new(p.to_owned()),
+            size: metadata.len(),
             size_all_children: 0,
             last_access_time: match metadata.accessed() {
                 Ok(v) => Ok(v),
@@ -62,6 +64,10 @@ impl DirEntry {
             children: vec![],
             parent,
         })
+    }
+
+    pub fn get_size(&self) -> u64 {
+        self.size
     }
 
     pub fn get_size_all_children(&self) -> u64 {
@@ -115,7 +121,9 @@ impl DirEntry {
 
             total += match entry {
                 Entry::File(ref f) => f.get_size(),
-                Entry::Dir(ref dir) => dir.calculate_size_all_children(&Some(*storage)),
+                Entry::Dir(ref dir) => {
+                    entry.get_size() + dir.calculate_size_all_children(&Some(*storage))
+                }
             };
         }
 

@@ -96,6 +96,13 @@ impl Entry {
         }
     }
 
+    pub fn get_size(&self) -> u64 {
+        match self {
+            Entry::File(f) => f.get_size(),
+            Entry::Dir(dir) => dir.get_size(),
+        }
+    }
+
     pub fn get_format_path(&self) -> String {
         match self {
             Entry::File(f) => f.get_format_path(),
