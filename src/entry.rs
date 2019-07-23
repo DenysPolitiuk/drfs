@@ -58,6 +58,18 @@ impl EntryWrapper {
             Entry::Dir(dir) => dir.calculate_size_all_children(&self.storage.as_ref()),
         }
     }
+
+    pub fn get_name(&self) -> String {
+        self.entry.get_name()
+    }
+
+    pub fn get_children(&self) -> Vec<String> {
+        self.entry.get_children()
+    }
+
+    pub fn get_children_len(&self) -> usize {
+        self.entry.get_children_len()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -109,6 +121,27 @@ impl Entry {
         match self {
             Entry::File(f) => f.get_format_path(),
             Entry::Dir(dir) => dir.get_format_path(),
+        }
+    }
+
+    pub fn get_name(&self) -> String {
+        match self {
+            Entry::File(f) => f.get_name(),
+            Entry::Dir(dir) => dir.get_name(),
+        }
+    }
+
+    pub fn get_children(&self) -> Vec<String> {
+        match self {
+            Entry::File(_) => vec![],
+            Entry::Dir(dir) => dir.get_children(),
+        }
+    }
+
+    pub fn get_children_len(&self) -> usize {
+        match self {
+            Entry::File(_) => 0,
+            Entry::Dir(dir) => dir.get_children_len(),
         }
     }
 }

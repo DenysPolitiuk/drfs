@@ -77,6 +77,18 @@ impl DirEntry {
         format!("{}", self.path_buf.display())
     }
 
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn get_children(&self) -> Vec<String> {
+        self.children.iter().map(|c| c.clone()).collect()
+    }
+
+    pub fn get_children_len(&self) -> usize {
+        self.children.len()
+    }
+
     pub fn count_entries_multi(&self, storage: &Option<&GenericStorage>) -> usize {
         let storage = match storage {
             // if no storage can only know about it's own children

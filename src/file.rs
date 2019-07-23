@@ -60,4 +60,8 @@ impl FileEntry {
     pub fn get_format_path(&self) -> String {
         format!("{}", self.path.display())
     }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
 }
