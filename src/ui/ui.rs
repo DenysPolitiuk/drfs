@@ -55,6 +55,28 @@ impl UIEntry {
         Ok(())
     }
 
+    fn replace_entry_with_parent(&mut self) {
+        if let Some(entry) = &mut self.entry {
+            if let Some(parent) = entry.get_parent() {
+                entry.replace_from_storage(&parent);
+                self.selected = None;
+            }
+        }
+    }
+
+    fn replace_entry_at_selected(&mut self) {
+        if let Some(selected) = self.selected {
+            let children = self.get_children();
+            let selected_entry = children.get(selected);
+            if let Some(selected_entry) = selected_entry {
+                if let Some(entry) = &mut self.entry {
+                    entry.replace_from_storage(&selected_entry);
+                    self.selected = None;
+                }
+            }
+        }
+    }
+
     fn load_entry(&mut self) -> bool {
         let e = &mut self.entry;
         match e {
@@ -242,7 +264,8 @@ pub fn run() -> Result<(), GenericError> {
                 Key::Backspace => {
                     command.pop();
                 }
-                Key::Left => main_entry.selected = None,
+                Key::Left => main_entry.replace_entry_with_parent(),
+                Key::Right => main_entry.replace_entry_at_selected(),
                 Key::Down => {
                     main_entry.selected = if let Some(selected) = main_entry.selected {
                         if selected >= main_entry.get_number_children() - 1 {
@@ -274,6 +297,7 @@ pub fn run() -> Result<(), GenericError> {
     Ok(())
 }
 
+// TODO: more commands?
 fn parse_command(command: &str) -> bool {
     match command {
         EXIT_COMMAND => true,

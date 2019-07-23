@@ -37,6 +37,14 @@ impl EntryWrapper {
         })
     }
 
+    pub fn replace_from_storage(&mut self, key: &String) {
+        if let Some(storage) = &mut self.storage {
+            if let Some(new_entry) = storage.get(&key) {
+                self.entry = new_entry;
+            }
+        }
+    }
+
     pub fn load_all_children(&mut self) -> Vec<GenericError> {
         if let Entry::Dir(ref mut dir) = self.entry {
             dir.load_all_children_with_storage(&self.storage)
