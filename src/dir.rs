@@ -314,6 +314,8 @@ impl DirEntry {
 
         self.clone_children_to_current(&children);
 
+        DirEntry::store_entry(&storage, self.get_format_path(), Entry::Dir(self.clone()));
+
         let (queue, mut workers, stealers) =
             DirEntry::create_queue_workers_stealers(num_cpus::get());
 
