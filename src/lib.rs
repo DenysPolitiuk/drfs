@@ -2,6 +2,7 @@ mod dir;
 mod entry;
 mod file;
 mod store;
+pub mod ui;
 
 pub use entry::Entry;
 pub use entry::EntryWrapper;

@@ -1,5 +1,6 @@
 use clap::{App, Arg};
 
+use drfs::ui::ui;
 use drfs::EntryWrapper;
 
 use std::env;
@@ -34,6 +35,12 @@ fn main() {
                 .help("target to process"),
         )
         .arg(
+            Arg::with_name("tui")
+                .short("T")
+                .long("tui")
+                .help("launch an interactive TUI"),
+        )
+        .arg(
             Arg::with_name("loops")
                 .short("l")
                 .long("loops")
@@ -59,6 +66,14 @@ fn main() {
         .parse::<u32>()
         .expect("unable to parse loops");
     let quiet = matches.is_present("quiet");
+    let is_tui = matches.is_present("tui");
+
+    if is_tui {
+        if let Err(e) = ui::run() {
+            println!("Got error in tui run : {}", e);
+        }
+        return;
+    }
 
     let mut total_load_children = 0;
     let mut total_count_entries = 0;
