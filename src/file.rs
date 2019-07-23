@@ -64,4 +64,8 @@ impl FileEntry {
     pub fn get_name(&self) -> String {
         self.name.clone()
     }
+
+    pub fn get_parent(&self) -> Option<String> {
+        self.parent.as_ref().cloned()
+    }
 }

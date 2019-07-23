@@ -81,6 +81,10 @@ impl DirEntry {
         self.name.clone()
     }
 
+    pub fn get_parent(&self) -> Option<String> {
+        self.parent.as_ref().cloned()
+    }
+
     pub fn get_children(&self) -> Vec<String> {
         self.children.iter().map(|c| c.clone()).collect()
     }

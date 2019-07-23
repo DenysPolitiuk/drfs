@@ -63,6 +63,10 @@ impl EntryWrapper {
         self.entry.get_name()
     }
 
+    pub fn get_parent(&self) -> Option<String> {
+        self.entry.get_parent()
+    }
+
     pub fn get_children(&self) -> Vec<String> {
         self.entry.get_children()
     }
@@ -142,6 +146,13 @@ impl Entry {
         match self {
             Entry::File(_) => 0,
             Entry::Dir(dir) => dir.get_children_len(),
+        }
+    }
+
+    pub fn get_parent(&self) -> Option<String> {
+        match self {
+            Entry::File(f) => f.get_parent(),
+            Entry::Dir(dir) => dir.get_parent(),
         }
     }
 }
